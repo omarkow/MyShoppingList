@@ -12,9 +12,14 @@ import SwiftData
 struct MyShoppingListApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
+            ShoppingList.self,
             Item.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let modelConfiguration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .private("iCloud.OM.MyShoppingList")
+        )
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])

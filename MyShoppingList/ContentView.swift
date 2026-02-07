@@ -10,23 +10,39 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @Query(sort: \ShoppingList.createdAt, order: .reverse) private var shoppingLists: [ShoppingList]
+    @State private var showingAddList = false
+    @State private var newListTitle = ""
 
     var body: some View {
         NavigationSplitView {
             List {
-                ForEach(items) { item in
+                ForEach(shoppingLists) { list in
                     NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
+                        ShoppingListDetailView(shoppingList: list)
                     } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(list.title)
+                                    .font(.headline)
+                                Text("\(list.uncheckedCount) restant(s) sur \(list.totalCount)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if list.uncheckedCount == 0 && list.totalCount > 0 {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            }
+                        }
                     }
                 }
-                .onDelete(perform: deleteItems)
+                .onDelete(perform: deleteLists)
             }
 #if os(macOS)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
+            .navigationSplitViewColumnWidth(min: 200, ideal: 250)
 #endif
+            .navigationTitle("Mes listes")
             .toolbar {
 #if os(iOS)
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -34,27 +50,39 @@ struct ContentView: View {
                 }
 #endif
                 ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+                    Button(action: { showingAddList = true }) {
+                        Label("Nouvelle liste", systemImage: "plus")
                     }
                 }
             }
+            .alert("Nouvelle liste", isPresented: $showingAddList) {
+                TextField("Titre de la liste", text: $newListTitle)
+                Button("Annuler", role: .cancel) { newListTitle = "" }
+                Button("Créer") { addList() }
+            }
         } detail: {
-            Text("Select an item")
+            Text("Sélectionnez une liste")
+                .foregroundStyle(.secondary)
         }
     }
 
-    private func addItem() {
+    private func addList() {
+        let title = newListTitle.trimmingCharacters(in: .whitespaces)
+        guard !title.isEmpty else {
+            newListTitle = ""
+            return
+        }
         withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
+            let list = ShoppingList(title: title)
+            modelContext.insert(list)
         }
+        newListTitle = ""
     }
 
-    private func deleteItems(offsets: IndexSet) {
+    private func deleteLists(offsets: IndexSet) {
         withAnimation {
             for index in offsets {
-                modelContext.delete(items[index])
+                modelContext.delete(shoppingLists[index])
             }
         }
     }
@@ -62,5 +90,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+        .modelContainer(for: [ShoppingList.self, Item.self], inMemory: true)
 }
