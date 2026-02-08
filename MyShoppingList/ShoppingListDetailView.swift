@@ -19,13 +19,7 @@ struct ShoppingListDetailView: View {
     @State private var showingShareSheet = false
     @State private var activeShare: CKShare?
     @State private var sharingError: String?
-
-    private var sortedItems: [Item] {
-        shoppingList.items.sorted {
-            if $0.isChecked != $1.isChecked { return !$0.isChecked }
-            return $0.timestamp < $1.timestamp
-        }
-    }
+    @State private var isSharing = false
 
     var body: some View {
         List {
@@ -41,8 +35,13 @@ struct ShoppingListDetailView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(action: startSharing) {
-                    Label("Partager", systemImage: "square.and.arrow.up")
+                    if isSharing {
+                        ProgressView()
+                    } else {
+                        Label("Partager", systemImage: "square.and.arrow.up")
+                    }
                 }
+                .disabled(isSharing)
             }
         }
         .sheet(isPresented: $showingShareSheet) {
@@ -63,6 +62,10 @@ struct ShoppingListDetailView: View {
             if let error = sharingError {
                 Text(error)
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sharedDataDidChange)) { _ in
+            // Sync local changes to the sharing store when remote changes arrive
+            CloudSharingManager.shared.syncChanges(for: shoppingList)
         }
     }
 
@@ -89,6 +92,7 @@ struct ShoppingListDetailView: View {
 #if os(iOS)
                     .textInputAutocapitalization(.sentences)
 #endif
+                    .onSubmit { addItem() }
                 Stepper("×\(newItemQuantity)", value: $newItemQuantity, in: 1...99)
                     .fixedSize()
                 Button(action: addItem) {
@@ -156,6 +160,9 @@ struct ShoppingListDetailView: View {
         newItemName = ""
         newItemQuantity = 1
         newItemCategory = ""
+
+        // Sync to sharing store if this list is shared
+        CloudSharingManager.shared.syncChanges(for: shoppingList)
     }
 
     private func deleteItems(from items: [Item], at offsets: IndexSet) {
@@ -164,20 +171,24 @@ struct ShoppingListDetailView: View {
                 modelContext.delete(items[index])
             }
         }
+        // Sync deletion to sharing store
+        CloudSharingManager.shared.syncChanges(for: shoppingList)
     }
 
     // MARK: - CloudKit Sharing
 
     private func startSharing() {
+        isSharing = true
         Task {
             do {
-                let manager = CloudSharingManager()
+                let manager = CloudSharingManager.shared
                 let share = try await manager.createShare(for: shoppingList)
                 activeShare = share
                 showingShareSheet = true
             } catch {
                 sharingError = error.localizedDescription
             }
+            isSharing = false
         }
     }
 }

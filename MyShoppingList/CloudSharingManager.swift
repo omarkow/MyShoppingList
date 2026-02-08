@@ -8,133 +8,131 @@
 import CloudKit
 import SwiftData
 
-/// Manages CloudKit sharing operations for shopping lists.
+/// High-level API for CloudKit sharing operations.
 ///
-/// SwiftData syncs data automatically to the user's private iCloud database.
-/// This manager handles sharing lists with other users via CKShare,
-/// creating CloudKit records in a shared zone that mirrors the SwiftData objects.
+/// Uses PersistenceController's NSPersistentCloudKitContainer for native
+/// CloudKit sharing (CKShare), providing automatic bidirectional sync
+/// of shared shopping lists between users.
 @Observable
 final class CloudSharingManager: @unchecked Sendable {
-    static let containerIdentifier = "iCloud.OM.MyShoppingList"
+    static let shared = CloudSharingManager()
 
-    private let ckContainer: CKContainer
-    private let privateDatabase: CKDatabase
+    let persistenceController: PersistenceController
 
-    nonisolated init() {
-        self.ckContainer = CKContainer(identifier: Self.containerIdentifier)
-        self.privateDatabase = ckContainer.privateCloudDatabase
-    }
-
-    // MARK: - Zone Management
-
-    /// Creates or fetches a dedicated record zone for sharing a shopping list.
-    func ensureSharedZone(for listID: PersistentIdentifier) async throws -> CKRecordZone {
-        let zoneName = "SharedList-\(listID.hashValue)"
-        let zoneID = CKRecordZone.ID(zoneName: zoneName, ownerName: CKCurrentUserDefaultName)
-        let zone = CKRecordZone(zoneID: zoneID)
-
-        return try await privateDatabase.save(zone)
+    nonisolated init(persistenceController: PersistenceController = .shared) {
+        self.persistenceController = persistenceController
     }
 
     // MARK: - Share Creation
 
-    /// Creates a CKShare for a shopping list, enabling multi-user collaboration.
+    /// Creates a CKShare for a shopping list using NSPersistentCloudKitContainer's native API.
+    /// If a share already exists, returns the existing one.
     func createShare(for shoppingList: ShoppingList) async throws -> CKShare {
-        let zone = try await ensureSharedZone(for: shoppingList.persistentModelID)
-
-        // Create a root CKRecord representing the shopping list
-        let listRecordID = CKRecord.ID(
-            recordName: "list-\(shoppingList.persistentModelID.hashValue)",
-            zoneID: zone.zoneID
-        )
-        let listRecord = CKRecord(recordType: "SharedShoppingList", recordID: listRecordID)
-        listRecord["title"] = shoppingList.title as CKRecordValue
-        listRecord["createdAt"] = shoppingList.createdAt as CKRecordValue
-
-        // Create item records as children of the list
-        var recordsToSave: [CKRecord] = [listRecord]
-        for item in shoppingList.items {
-            let itemRecordID = CKRecord.ID(
-                recordName: "item-\(item.persistentModelID.hashValue)-\(item.timestamp.timeIntervalSince1970)",
-                zoneID: zone.zoneID
-            )
-            let itemRecord = CKRecord(recordType: "SharedItem", recordID: itemRecordID)
-            itemRecord["name"] = item.name as CKRecordValue
-            itemRecord["quantity"] = item.quantity as CKRecordValue
-            itemRecord["isChecked"] = item.isChecked as CKRecordValue
-            itemRecord["category"] = item.category as CKRecordValue
-            itemRecord["timestamp"] = item.timestamp as CKRecordValue
-            itemRecord.parent = CKRecord.Reference(recordID: listRecordID, action: .none)
-            recordsToSave.append(itemRecord)
+        // Check for existing share first
+        if let existingShare = persistenceController.existingShare(for: shoppingList) {
+            return existingShare
         }
 
-        // Create the share with read/write permissions
-        let share = CKShare(rootRecord: listRecord)
-        share[CKShare.SystemFieldKey.title] = shoppingList.title as CKRecordValue
-        share.publicPermission = .readWrite
-        recordsToSave.append(share)
-
-        // Save all records and the share atomically
-        let operation = CKModifyRecordsOperation(recordsToSave: recordsToSave)
-        operation.savePolicy = .changedKeys
-
         return try await withCheckedThrowingContinuation { continuation in
-            operation.modifyRecordsResultBlock = { result in
-                switch result {
-                case .success:
-                    continuation.resume(returning: share)
-                case .failure(let error):
+            persistenceController.share(shoppingList) { share, error in
+                if let error = error {
                     continuation.resume(throwing: error)
+                } else if let share = share {
+                    continuation.resume(returning: share)
+                } else {
+                    continuation.resume(throwing: SharingError.shareCreationFailed)
                 }
             }
-            privateDatabase.add(operation)
         }
     }
 
-    // MARK: - Sync Shared Data
+    // MARK: - Share Acceptance
 
-    /// Fetches shared shopping list records from CloudKit and imports them into SwiftData.
-    func fetchSharedLists(into modelContext: ModelContext) async throws {
-        let sharedDB = ckContainer.sharedCloudDatabase
+    /// Accepts a CloudKit share invitation from another user.
+    func acceptShare(_ metadata: CKShare.Metadata) async throws {
+        try await persistenceController.acceptShare(metadata)
+    }
 
-        let query = CKQuery(
-            recordType: "SharedShoppingList",
-            predicate: NSPredicate(value: true)
-        )
+    // MARK: - Shared Data Import
 
-        let (results, _) = try await sharedDB.records(matching: query)
+    /// Imports shared shopping lists from the Core Data shared store into SwiftData.
+    func importSharedLists(into modelContext: ModelContext) {
+        let sharedCDLists = persistenceController.fetchSharedLists()
 
-        for (_, result) in results {
-            guard let record = try? result.get(),
-                  let title = record["title"] as? String else {
-                continue
+        for cdList in sharedCDLists {
+            // Check if we already have this list locally (by matching listID)
+            let listID = cdList.listID
+            let descriptor = FetchDescriptor<ShoppingList>()
+            let existingLists = (try? modelContext.fetch(descriptor)) ?? []
+            let alreadyImported = existingLists.contains { list in
+                "\(list.persistentModelID.hashValue)" == listID
             }
 
-            let list = ShoppingList(title: title)
-            if let createdAt = record["createdAt"] as? Date {
-                list.createdAt = createdAt
-            }
+            guard !alreadyImported else { continue }
+
+            // Create SwiftData objects from Core Data shared objects
+            let list = ShoppingList(title: cdList.title)
+            list.createdAt = cdList.createdAt
             modelContext.insert(list)
 
-            // Fetch child items for this list
-            let itemPredicate = NSPredicate(value: true)
-            let itemQuery = CKQuery(recordType: "SharedItem", predicate: itemPredicate)
-            let (itemResults, _) = try await sharedDB.records(matching: itemQuery)
-
-            for (_, itemResult) in itemResults {
-                guard let itemRecord = try? itemResult.get(),
-                      let name = itemRecord["name"] as? String else {
-                    continue
-                }
+            for cdItem in cdList.itemsArray {
                 let item = Item(
-                    name: name,
-                    quantity: (itemRecord["quantity"] as? Int) ?? 1,
-                    category: (itemRecord["category"] as? String) ?? ""
+                    name: cdItem.name,
+                    quantity: Int(cdItem.quantity),
+                    category: cdItem.category
                 )
-                item.isChecked = (itemRecord["isChecked"] as? Bool) ?? false
+                item.isChecked = cdItem.isChecked
+                item.timestamp = cdItem.timestamp
                 item.shoppingList = list
                 modelContext.insert(item)
             }
+        }
+    }
+
+    // MARK: - Sync Updates
+
+    /// Syncs local changes back to the Core Data shared store for sharing.
+    func syncChanges(for shoppingList: ShoppingList) {
+        let cdList = persistenceController.findOrCreateCDShoppingList(for: shoppingList)
+        let context = persistenceController.container.viewContext
+
+        // Update list properties
+        cdList.title = shoppingList.title
+
+        // Sync items: remove old, add current
+        if let existingItems = cdList.items as? Set<CDItem> {
+            for cdItem in existingItems {
+                context.delete(cdItem)
+            }
+        }
+
+        for item in shoppingList.items {
+            let cdItem = CDItem(context: context)
+            cdItem.name = item.name
+            cdItem.quantity = Int64(item.quantity)
+            cdItem.isChecked = item.isChecked
+            cdItem.category = item.category
+            cdItem.timestamp = item.timestamp
+            cdItem.itemID = "\(item.persistentModelID.hashValue)"
+            cdItem.shoppingList = cdList
+        }
+
+        try? context.save()
+    }
+}
+
+// MARK: - Errors
+
+enum SharingError: LocalizedError {
+    case shareCreationFailed
+    case sharedStoreUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .shareCreationFailed:
+            return "Impossible de créer le partage. Vérifiez votre connexion iCloud."
+        case .sharedStoreUnavailable:
+            return "Le magasin de données partagées n'est pas disponible."
         }
     }
 }

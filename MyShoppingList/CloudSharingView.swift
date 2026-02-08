@@ -14,6 +14,7 @@ struct CloudSharingView: UIViewControllerRepresentable {
     let share: CKShare
     let container: CKContainer
     let listTitle: String
+    @Environment(\.dismiss) private var dismiss
 
     func makeUIViewController(context: Context) -> UICloudSharingController {
         share[CKShare.SystemFieldKey.title] = listTitle as CKRecordValue
@@ -26,15 +27,29 @@ struct CloudSharingView: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UICloudSharingController, context: Context) {}
 
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(dismiss: dismiss)
     }
 
     class Coordinator: NSObject, UICloudSharingControllerDelegate {
+        let dismiss: DismissAction
+
+        init(dismiss: DismissAction) {
+            self.dismiss = dismiss
+        }
+
         func cloudSharingController(
             _ csc: UICloudSharingController,
             failedToSaveShareWithError error: Error
         ) {
             print("Failed to save share: \(error.localizedDescription)")
+        }
+
+        func cloudSharingControllerDidSaveShare(_ csc: UICloudSharingController) {
+            dismiss()
+        }
+
+        func cloudSharingControllerDidStopSharing(_ csc: UICloudSharingController) {
+            dismiss()
         }
 
         func itemTitle(for csc: UICloudSharingController) -> String? {
@@ -43,27 +58,19 @@ struct CloudSharingView: UIViewControllerRepresentable {
     }
 }
 #elseif os(macOS)
-/// macOS fallback: uses NSSharingServicePicker for CloudKit sharing.
-struct CloudSharingView: NSViewRepresentable {
+/// macOS: uses NSSharingServicePicker with CloudKit sharing support.
+struct CloudSharingView: NSViewControllerRepresentable {
     let share: CKShare
     let container: CKContainer
     let listTitle: String
 
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async {
-            let sharingService = NSSharingService(named: .cloudSharing)
-            if let service = sharingService {
-                let items: [Any] = [
-                    CKShareMetadata() // Placeholder — macOS sharing requires full CloudKit setup in Xcode
-                ]
-                let picker = NSSharingServicePicker(items: items)
-                picker.show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
-            }
-        }
-        return view
+    func makeNSViewController(context: Context) -> NSSharingServicePickerViewController {
+        let itemProvider = NSItemProvider()
+        itemProvider.registerCloudKitShare(share, container: container)
+        let picker = NSSharingServicePickerViewController(items: [itemProvider])
+        return picker
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {}
+    func updateNSViewController(_ nsViewController: NSSharingServicePickerViewController, context: Context) {}
 }
 #endif
