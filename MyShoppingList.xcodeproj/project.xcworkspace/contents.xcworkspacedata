@@ -4,4 +4,34 @@
    <FileRef
       location = "self:">
    </FileRef>
+   <FileRef
+      location = "group:CONFIGURATION_CLOUDKIT_SHARING.md">
+   </FileRef>
+   <FileRef
+      location = "group:verify_cloudkit_config.sh">
+   </FileRef>
+   <FileRef
+      location = "group:CLOUDKIT_SHARING_FLOW.md">
+   </FileRef>
+   <FileRef
+      location = "group:SOLUTION_RAPIDE.md">
+   </FileRef>
+   <FileRef
+      location = "group:VISUALISATION_PROBLEME.md">
+   </FileRef>
+   <FileRef
+      location = "group:README_CLOUDKIT_FIX.md">
+   </FileRef>
+   <FileRef
+      location = "group:GUIDE_DASHBOARD_CLOUDKIT.md">
+   </FileRef>
+   <FileRef
+      location = "group:FIX_IMMEDIAT.md">
+   </FileRef>
+   <FileRef
+      location = "group:INDEX_DOCUMENTATION.md">
+   </FileRef>
+   <FileRef
+      location = "group:LISEZ_MOI_EN_PREMIER.md">
+   </FileRef>
 </Workspace>

@@ -1,32 +1,45 @@
-//
-//  MyShoppingListApp.swift
-//  MyShoppingList
-//
-//  Created by Olivier Markowitch on 21/12/2025.
-//
-
 import SwiftUI
-import SwiftData
+import CoreData
+import CloudKit
 
 @main
-struct MyShoppingListApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+struct MaListeDeCoursesApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @StateObject private var persistenceController = PersistenceController.shared
 
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                .environmentObject(persistenceController)
         }
-        .modelContainer(sharedModelContainer)
     }
 }
+
+class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, userDidAcceptCloudKitShareWith cloudKitShareMetadata: CKShare.Metadata) {
+        let container = PersistenceController.shared.container
+        
+        // Récupérer le store persistant
+        guard let store = container.persistentStoreCoordinator.persistentStores.first else {
+            print("❌ Impossible de trouver le persistent store")
+            return
+        }
+        
+        // Accepter le partage CloudKit
+        container.acceptShareInvitations(from: [cloudKitShareMetadata], into: store) { _, error in
+            if let error = error {
+                print("❌ Erreur acceptation partage: \(error.localizedDescription)")
+            } else {
+                print("✅ Partage accepté avec succès!")
+            }
+        }
+    }
+    
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+        // Configuration additionnelle si nécessaire
+        print("✅ App lancée avec Core Data + CloudKit")
+        return true
+    }
+}
+
