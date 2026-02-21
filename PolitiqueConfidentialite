@@ -1,5 +1,60 @@
-Politique de confidentialité
+Politique de Confidentialité - My Shopping List
+Date de dernière mise à jour : 21 février 2026
 
-Aucune information personnelle (que ce soit à propos des utilisateurs ou des éléments des listes de courses) n'est transnmise (ni donc vendues) à un tiers.
+1. Introduction
+My Shopping List respecte votre vie privée. Cette politique de confidentialité explique quelles données nous collectons, comment nous les utilisons et quels sont vos droits.
 
-No personal information (whether about users or items on shopping lists) is transmitted (or sold) to third party.
+2. Données que nous collectons
+
+2.1 Informations de compte
+Lorsque vous créez un compte, nous collectons : 
+- Adresse email : pour vous identifier et vous permettre de vous connecter 
+- Mot de passe : stocké de manière sécurisée, nous ne pouvons pas le lire
+
+2.2 Données de l'application
+Lorsque vous utilisez l'application, nous stockons : 
+- Listes de courses : les listes que vous créez et leurs noms 
+- Articles : les articles que vous ajoutez à vos listes (nom, quantité, rayon, ...)
+- Partages : les personnes avec qui vous partagez vos listes
+
+2.3 Données techniques
+Pour assurer le bon fonctionnement de l'application : 
+- Métadonnées de synchronisation : horodatages de vos modifications - Informations de session : pour maintenir votre connexion active
+
+2.4 Nous NE collectons :
+❌ Aucune donnée de localisation
+❌ Aucun contact de votre téléphone
+❌ Aucune photo ou média
+❌ Aucune donnée bancaire ou de paiement
+❌ Aucune donnée de navigation web
+❌ Aucun identifiant publicitaire
+
+3. Comment nous utilisons vos données
+Vos données sont utilisées uniquement pour le fonctionnement de l'application - Vous permettre de vous connecter - Sauvegarder et synchroniser vos listes entre vos appareils - Partager vos listes avec les personnes que vous choisissez
+Nous n'utilisons JAMAIS vos données pour : - Vous envoyer de la publicité - Vendre vos informations à des tiers - Créer des profils marketing - Vous suivre sur d'autres applications ou sites web
+
+4. Partage de vos données
+Nous ne vendons ni ne louons jamais vos données personnelles.
+Vos données peuvent être partagées uniquement dans les cas suivants : 
+- personnes que vous choisissez : Lorsque vous partagez une liste avec quelqu'un (via le code de partage), 
+- cette personne voit : le nom de la liste, les articles de la liste, le nom des autres membres
+
+Prestataire d'hébergement : Nos données sont hébergées sur un serveur sécurisé (PocketBase sur Hetzner) qui respecte les normes de sécurité européennes (RGPD).
+
+Vos données sont stockées sur des serveurs situés dans l'Union Européenne et ne sont pas transférées en dehors de l'UE.
+
+5. Conservation des données
+Les listes que vous supprimez sont effacées immédiatement Les articles supprimés ne sont pas conservés
+
+6. Cookies et technologies de suivi
+My Shopping List n'utilise AUCUN cookie ni outil de suivi.
+Nous n'utilisons pas : - ❌ Google Analytics - ❌ Facebook Pixel - ❌ Publicités - ❌ Trackers tiers
+Seul un token de session local est utilisé pour maintenir votre connexion active (il n'est pas partagé avec des tiers).
+
+7. Modifications de cette politique
+Nous pouvons mettre à jour cette politique de confidentialité occasionnellement.
+
+8. Contact
+Pour toute question concernant cette politique de confidentialité ou vos données personnelles :
+📧 Email : olivier@markowitch.net
+🌐 Site web : www.markapp.org
